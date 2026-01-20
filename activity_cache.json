@@ -1,0 +1,7 @@
+{
+    "github.com": "productive",
+    "google.com": "neutral",
+    "youtube.com": "distraction",
+    "gemini.google.com": "neutral",
+    "localhost:5173": "distraction"
+}

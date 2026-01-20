@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "@nut-tree-fork/nut-js": "^4.2.6",
+    "node-record-lpcm16": "^1.0.1",
+    "vosk": "^0.3.39"
+  }
+}
