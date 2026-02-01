@@ -1,36 +1,44 @@
-// Function to get the current tab and send it to Katya
-function reportActiveTab() {
-    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+// Function to get ALL tabs and send them to Katya
+function reportAllTabs() {
+    // Query ALL tabs in ALL windows
+    chrome.tabs.query({}, function(tabs) {
         if (tabs && tabs.length > 0) {
-            let tab = tabs[0];
             
-            // Filter out internal Chrome pages
-            if (tab.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('about:blank')) {
-                
-                // Send "Heartbeat" to Python Server
-                fetch('http://127.0.0.1:5000/track', {
+            // 1. Clean the data (Remove chrome:// internals)
+            const cleanTabs = tabs
+                .filter(tab => tab.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('about:'))
+                .map(tab => ({
+                    url: tab.url,
+                    title: tab.title,
+                    active: tab.active // We flag which one you are actually looking at
+                }));
+
+            // 2. Send the Batch to Python
+            if (cleanTabs.length > 0) {
+                fetch('http://127.0.0.1:5000/track_batch', { // <--- NEW ENDPOINT
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url: tab.url })
+                    body: JSON.stringify({ tabs: cleanTabs })
                 }).catch(err => {
-                    // Ignore errors if Katya is offline
+                    // Ignore offline errors
                 });
             }
         }
     });
 }
 
-// 1. LISTEN FOR CLICKS/UPDATES (Instant Reaction)
+// LISTENERS
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-    if (changeInfo.status === 'complete') {
-        reportActiveTab();
-    }
+    if (changeInfo.status === 'complete') reportAllTabs();
 });
 
 chrome.tabs.onActivated.addListener(() => {
-    reportActiveTab();
+    reportAllTabs();
 });
 
-// 2. THE HEARTBEAT (Check every 1 second)
-// This fixes the "Stuck at 13s" bug
-setInterval(reportActiveTab, 1000);
+chrome.tabs.onRemoved.addListener(() => {
+    reportAllTabs();
+});
+
+// Heartbeat (Every 2 seconds is enough for batch processing)
+setInterval(reportAllTabs, 2000);

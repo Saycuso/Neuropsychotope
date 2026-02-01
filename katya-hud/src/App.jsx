@@ -1,31 +1,46 @@
 import { useState, useEffect } from 'react';
 import io from 'socket.io-client';
-import './App.css'; // Ensure you have basic styles
+import './App.css'; 
 
 const socket = io('http://localhost:5000');
 
 function App() {
-  const [view, setView] = useState("CONNECTING"); // CONNECTING, SETUP, DASHBOARD
+  const [view, setView] = useState("CONNECTING"); 
   const [user, setUser] = useState(null);
-  
-  // Form State
   const [formData, setFormData] = useState({ name: "", profession: "", quest: "" });
 
-  useEffect(() => {
-    // 1. Listen for "Setup Needed"
-    socket.on('trigger_setup', () => {
-      setView("SETUP");
-    });
+  // --- NEW ECONOMY STATE ---
+  const [economy, setEconomy] = useState({
+    balance: 0,
+    change: 0,
+    status: "IDLE", 
+    locked: false,
+    domain: "SYSTEM READY"
+  });
 
-    // 2. Listen for "Login Success"
+  useEffect(() => {
+    // 1. Identity Handlers
+    socket.on('trigger_setup', () => setView("SETUP"));
     socket.on('auth_success', (userData) => {
       setUser(userData);
       setView("DASHBOARD");
     });
 
+    // 2. ECONOMY HANDLER (The Money Stream)
+    socket.on('status_update', (data) => {
+      setEconomy({
+        balance: data.balance,
+        change: data.change,
+        status: data.status,
+        locked: data.locked,
+        domain: data.domain
+      });
+    });
+
     return () => {
       socket.off('trigger_setup');
       socket.off('auth_success');
+      socket.off('status_update');
     };
   }, []);
 
@@ -33,128 +48,119 @@ function App() {
     socket.emit('create_identity', formData);
   };
 
-  // --- VIEW 1: CHARACTER CREATION (The Gamified Part) ---
+  // --- VIEW 1: SETUP (Unchanged) ---
   if (view === "SETUP") {
     return (
-      <div className="setup-container" style={{
-        height: "100vh",
-        background: "#050505",
-        color: "#00f3ff",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "center",
-        alignItems: "center",
-        fontFamily: "'Courier New', monospace",
-        border: "2px solid #00f3ff",
-        boxShadow: "inset 0 0 50px rgba(0, 243, 255, 0.2)"
-      }}>
+      <div style={setupContainerStyle}>
         <h1 style={{textShadow: "0 0 10px #00f3ff"}}>NEUROPSYCHOTOPE v7.0</h1>
         <p className="blink">⚠️ NEURAL LINK UNRECOGNIZED ⚠️</p>
         
         <div style={{marginTop: "20px", width: "300px", display: "flex", flexDirection: "column", gap: "15px"}}>
-          
-          <div>
-            <label style={{fontSize: "12px", opacity: 0.7}}>CODENAME</label>
-            <input 
-              type="text" 
-              placeholder="e.g. Saycuso"
-              style={inputStyle}
-              onChange={(e) => setFormData({...formData, name: e.target.value})}
-            />
-          </div>
-
-          <div>
-            <label style={{fontSize: "12px", opacity: 0.7}}>CLASS (PROFESSION)</label>
-            <input 
-              type="text" 
-              placeholder="e.g. Full Stack Developer"
-              style={inputStyle}
-              onChange={(e) => setFormData({...formData, profession: e.target.value})}
-            />
-          </div>
-
-          <div>
-            <label style={{fontSize: "12px", opacity: 0.7}}>CURRENT QUEST (GOAL)</label>
-            <input 
-              type="text" 
-              placeholder="e.g. Secure ₹10 LPA Job"
-              style={inputStyle}
-              onChange={(e) => setFormData({...formData, quest: e.target.value})}
-            />
-          </div>
-
-          <button onClick={handleSetupSubmit} style={buttonStyle}>
-            INITIALIZE UPLINK
-          </button>
+          <input type="text" placeholder="CODENAME" style={inputStyle} onChange={(e) => setFormData({...formData, name: e.target.value})} />
+          <input type="text" placeholder="CLASS (e.g. Dev)" style={inputStyle} onChange={(e) => setFormData({...formData, profession: e.target.value})} />
+          <input type="text" placeholder="MAIN QUEST" style={inputStyle} onChange={(e) => setFormData({...formData, quest: e.target.value})} />
+          <button onClick={handleSetupSubmit} style={buttonStyle}>INITIALIZE</button>
         </div>
       </div>
     );
   }
 
-  // --- VIEW 2: THE HUD (Your Dashboard) ---
+  // --- VIEW 2: DASHBOARD (The Upgrade) ---
   if (view === "DASHBOARD" && user) {
+    // Dynamic Styles based on State
+    const isLocked = economy.locked;
+    const isSpending = economy.change < 0;
+    const themeColor = isLocked ? "#ff0000" : (isSpending ? "#ffaa00" : "#00f3ff");
+
     return (
       <div style={{
         height: "100vh",
-        background: "rgba(13, 13, 13, 0.95)",
-        border: "2px solid #00f3ff",
+        background: `radial-gradient(circle, rgba(10,10,10,1) 0%, rgba(0,0,0,1) 100%)`,
+        border: `2px solid ${themeColor}`,
         padding: "20px",
         fontFamily: "'Courier New', monospace",
-        color: "#00f3ff"
+        color: themeColor,
+        boxShadow: `inset 0 0 20px ${themeColor}20`,
+        transition: "all 0.5s ease"
       }}>
-        {/* Top Bar: Identity */}
-        <div style={{borderBottom: "1px solid #333", paddingBottom: "10px", marginBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "center"}}>
+        
+        {/* TOP BAR: Player Info + BALANCE */}
+        <div style={{display: "flex", justifyContent: "space-between", borderBottom: `1px solid ${themeColor}50`, paddingBottom: "10px"}}>
           <div>
-            <div style={{fontSize: "10px", color: "#666"}}>OPERATIVE</div>
-            <div style={{fontSize: "18px", fontWeight: "bold"}}>{user.name}</div>
+            <div style={{fontSize: "10px", opacity: 0.7}}>OPERATIVE</div>
+            <div style={{fontWeight: "bold"}}>{user.name}</div>
           </div>
+          
+          {/* THE WALLET */}
           <div style={{textAlign: "right"}}>
-            <div style={{fontSize: "10px", color: "#666"}}>CLASS</div>
-            <div style={{fontSize: "14px"}}>{user.profession}</div>
+            <div style={{fontSize: "10px", opacity: 0.7}}>CREDITS</div>
+            <div style={{fontSize: "24px", fontWeight: "bold", textShadow: `0 0 10px ${themeColor}`}}>
+              ${economy.balance}
+            </div>
           </div>
         </div>
 
-        {/* Main Quest Display */}
-        <div style={{background: "rgba(0, 243, 255, 0.05)", padding: "15px", borderLeft: "4px solid #00f3ff", marginBottom: "20px"}}>
-          <div style={{fontSize: "10px", letterSpacing: "2px", marginBottom: "5px"}}>CURRENT MAIN QUEST</div>
-          <div style={{fontSize: "20px", textShadow: "0 0 10px rgba(0, 243, 255, 0.5)"}}>
-            {user.main_quest}
+        {/* CENTER: Main Quest */}
+        <div style={{margin: "40px 0", textAlign: "center"}}>
+           <div style={{fontSize: "10px", letterSpacing: "2px", opacity: 0.7}}>CURRENT OBJECTIVE</div>
+           <div style={{fontSize: "22px", marginTop: "5px"}}>{user.main_quest}</div>
+        </div>
+
+        {/* ACTIVE STATUS (The Ticker) */}
+        <div style={{
+          background: `${themeColor}10`, 
+          border: `1px solid ${themeColor}`, 
+          padding: "20px", 
+          borderRadius: "4px",
+          textAlign: "center"
+        }}>
+          <div style={{fontSize: "12px", opacity: 0.8}}>{economy.domain.toUpperCase()}</div>
+          
+          <div style={{fontSize: "30px", fontWeight: "bold", margin: "10px 0"}}>
+            {economy.status}
+          </div>
+
+          <div style={{fontSize: "14px", fontWeight: "bold"}}>
+             {economy.change > 0 ? "+" : ""}{economy.change} Credits / Tick
           </div>
         </div>
 
-        {/* The Stats (Sanity/Focus) go here... */}
-        <div style={{opacity: 0.5, fontSize: "12px", textAlign: "center", marginTop: "50px"}}>
-          SYSTEM: ONLINE | AWAITING INPUT
-        </div>
+        {/* LOCKED WARNING */}
+        {isLocked && (
+          <div className="blink" style={{
+            marginTop: "20px", 
+            color: "red", 
+            textAlign: "center", 
+            fontSize: "20px", 
+            fontWeight: "bold", 
+            background: "black", 
+            padding: "10px"
+          }}>
+            ⛔ RECOVERY MODE ACTIVE ⛔<br/>
+            EARN 100 CREDITS TO UNLOCK
+          </div>
+        )}
 
       </div>
     );
   }
 
-  return <div style={{background: "black", color: "white", height: "100vh", display: "grid", placeItems: "center"}}>CONNECTING TO KATYA CORE...</div>;
+  return <div style={{background: "black", color: "white", height: "100vh", display: "grid", placeItems: "center"}}>CONNECTING...</div>;
 }
 
-// Styles
-const inputStyle = {
-  width: "100%",
-  background: "transparent",
-  border: "none",
-  borderBottom: "1px solid #00f3ff",
-  color: "white",
-  padding: "8px",
-  fontFamily: "inherit",
-  outline: "none"
+// STYLES
+const setupContainerStyle = {
+  height: "100vh", background: "#050505", color: "#00f3ff", display: "flex", 
+  flexDirection: "column", justifyContent: "center", alignItems: "center", 
+  fontFamily: "'Courier New', monospace"
 };
-
+const inputStyle = {
+  width: "100%", background: "transparent", border: "none", borderBottom: "1px solid #00f3ff", 
+  color: "white", padding: "8px", fontFamily: "inherit", outline: "none"
+};
 const buttonStyle = {
-  marginTop: "20px",
-  background: "#00f3ff",
-  color: "black",
-  border: "none",
-  padding: "10px",
-  fontWeight: "bold",
-  cursor: "pointer",
-  clipPath: "polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)"
+  marginTop: "20px", background: "#00f3ff", color: "black", border: "none", 
+  padding: "10px", fontWeight: "bold", cursor: "pointer"
 };
 
 export default App;
