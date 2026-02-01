@@ -1,10 +1,5 @@
 [
     {
-        "time": "2026-01-19 23:35:19.775790",
-        "user": "hvernig er lj\u00f3kast?",
-        "katya": "Lj\u00f3kasta er ein l\u00edffrj\u00f3leg kraft sem er \u00fatbora \u00far solan\u00e6turum \u00e1 landi, en \u00e9g \u00feekki ekki fleira um \u00feetta."
-    },
-    {
         "time": "2026-01-19 23:35:36.990065",
         "user": "what are you thinking?",
         "katya": "I'm just here to help and listen, so feel free to share whatever's on your mind."
@@ -48,5 +43,10 @@
         "time": "2026-02-01 06:07:38.733771",
         "user": "hey katia",
         "katya": "It's great to see you, and I'm here to help you with anything on your mind, so what's up?"
+    },
+    {
+        "time": "2026-02-01 06:29:43.426520",
+        "user": "hello, god",
+        "katya": "That's a beautiful and simple greeting - what's been on your mind that's led you to say hello to a higher power?"
     }
 ]
