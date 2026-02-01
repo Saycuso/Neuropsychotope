@@ -13,6 +13,9 @@ import comtypes
 from flask import Flask, request
 from datetime import datetime
 from groq import Groq
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Imports for Volume Control
 from ctypes import cast, POINTER
@@ -20,7 +23,7 @@ from comtypes import CLSCTX_ALL
 from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
 
 # --- CONFIGURATION ---
-GROQ_API_KEY = "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" 
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 MEMORY_FILE = "katya_memory.json"
 CACHE_FILE = "activity_cache.json"
 VOICE = "en-US-AriaNeural"
@@ -68,9 +71,10 @@ def kill_browser():
     # >nul 2>&1 hides the massive list of PID successes/errors
     os.system("taskkill /F /IM chrome.exe /T >nul 2>&1")
 
-def judge_url_category(url):
+def judge_activity_category(url):
     """Decides if a URL is Productive or Distraction"""
     try:
+        
         clean_domain = url.replace("https://", "").replace("http://", "").replace("www.", "").split('/')[0].lower()
     except: return "neutral", ""
 
@@ -112,7 +116,7 @@ def track_activity():
     url = data.get('url', '')
     if not url: return {"status": "ignored"}
     
-    category, domain = judge_url_category(url)
+    category, domain = judge_activity_category(url)
     
     # --- LOGIC: Only Print on CHANGE ---
     if category != last_category:

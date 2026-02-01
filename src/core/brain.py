@@ -5,6 +5,7 @@ import psutil
 from datetime import datetime
 from groq import Groq
 from config import GROQ_API_KEY, MEMORY_FILE, CACHE_FILE
+from identity import load_identity
 
 client = Groq(api_key=GROQ_API_KEY)
 
@@ -18,16 +19,22 @@ def save_data(file_path, data):
     with open(file_path, 'w') as f: json.dump(data, f, indent=4)
 
 def transcribe_audio(filename):
-    if not filename or not os.path.exists(filename): return ""
+    if not filename or not os.path.exists(filename): 
+        print("[ERROR] Audio file not found.")
+        return ""
+    
     with open(filename, "rb") as file:
         try:
+            # print("Transcribing...") # Optional debug
             return client.audio.transcriptions.create(
                 file=(filename, file.read()),
                 model="whisper-large-v3-turbo",
                 response_format="text"
             ).strip()
-        except: return ""
-
+        except Exception as e: 
+            print(f"\033[91m[TRANSCRIPTION ERROR]: {e}\033[0m") # <--- PRINT THE ERROR
+            return ""
+        
 def get_system_stats():
     """Grabs CPU, RAM, Top Processes, AND Disk Space"""
     # 1. Basic Stats
@@ -109,23 +116,34 @@ def ask_katya(user_input):
         return reply
     except: return "Connection lost."
 
-def judge_url(url):
-    try: clean_domain = url.replace("https://", "").replace("http://", "").replace("www.", "").split('/')[0].lower()
-    except: return "neutral", ""
+def judge_activity(url, title): # Renamed from judge_activity to judge_activity
+    user = load_identity()
+    profession = user.get("profession", "Novice").lower()
+    
+    clean_url = url.replace("https://", "").replace("http://", "").lower()
+    clean_title = title.lower() if title else ""
 
-    cache = load_data(CACHE_FILE)
-    if clean_domain in cache: return cache[clean_domain], clean_domain
+    # 1. PROFESSION-BASED WHITELIST (Hardcoded Rules)
+    if "content creator" in profession or "artist" in profession:
+        if "instagram.com" in clean_url or "pinterest.com" in clean_url:
+            return "productive", "Market Research"
+            
+    if "developer" in profession:
+        if "github.com" in clean_url or "stackoverflow.com" in clean_url or "localhost" in clean_url:
+            return "productive", "Coding"
 
-    print(f"\033[93m[Katya]: Analyzing new domain: {clean_domain}...\033[0m")
-    try:
-        completion = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
-            messages=[{"role": "user", "content": f"Categorize '{clean_domain}' as 'Productive', 'Distraction', or 'Neutral'. Output 1 word."}],
-            max_tokens=10
-        )
-        verdict = completion.choices[0].message.content.strip().lower()
-        final = "productive" if "productive" in verdict else "distraction"
-        cache[clean_domain] = final
-        save_data(CACHE_FILE, cache)
-        return final, clean_domain
-    except: return "neutral", clean_domain
+    # 2. YOUTUBE CONTEXT ANALYSIS (The "Smart" Judge)
+    if "youtube.com" in clean_url:
+        # If title indicates learning, let it pass
+        productive_keywords = ["tutorial", "course", "lecture", "python", "react", "coding", "math"]
+        if any(k in clean_title for k in productive_keywords):
+            return "productive", f"Learning: {clean_title[:20]}..."
+        else:
+            return "distraction", "YouTube Leisure"
+
+    # 3. FALLBACK: AI JUDGMENT (For unknown sites)
+    # (Use your existing AI cache logic here, but pass the Title too for better context)
+    # ... keep your existing cache/groq logic here ...
+    
+    # Temporary fallback for this snippet:
+    return "neutral", clean_url
