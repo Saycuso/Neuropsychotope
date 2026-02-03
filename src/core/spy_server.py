@@ -5,128 +5,153 @@ from flask import Flask, request
 from flask_socketio import SocketIO, emit
 from datetime import datetime
 
-# IMPORTS (Must exist)
+# IMPORTS
 try:
     from brain import judge_activity
     from system_control import mute_system_volume, kill_browser
     from audio_engine import speak
     from identity import load_identity, save_identity 
     from economy import process_transaction 
+    from quests import update_quest_progress, load_quests # <--- NEW IMPORT
 except ImportError as e:
-    print(f"\n\033[91m[CRITICAL ERROR] Missing File: {e}\033[0m")
-    print("Make sure brain.py, system_control.py, etc. are in src/core/")
+    print(f"[CRITICAL] Missing: {e}")
     exit()
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'katya_secret'
 socketio = SocketIO(app, cors_allowed_origins="*")
+log = logging.getLogger('werkzeug'); log.setLevel(logging.ERROR)
 
-# Reduce Flask logging spam
-log = logging.getLogger('werkzeug')
-log.setLevel(logging.ERROR)
-
-# --- STATE ---
 is_recovery_mode = False 
 last_category = None
+last_label = None
 
 @app.route('/')
 def index(): return "Katya Neural Link Active"
 
-# --- IDENTITY HANDLERS ---
+# --- HUD ---
 @socketio.on('connect')
 def handle_connect():
-    print("\n\033[96m[UI] HUD Connected via SocketIO\033[0m")
+    print("[UI] HUD Connected")
     user = load_identity()
-    if user["is_initialized"]:
-        emit('auth_success', user)
-    else:
-        emit('trigger_setup', {"message": "IDENTITY_NOT_FOUND"})
+    if user["is_initialized"]: emit('auth_success', user)
+    else: emit('trigger_setup', {"message": "IDENTITY_NOT_FOUND"})
 
 @socketio.on('create_identity')
 def handle_creation(data):
-    print(f"[UI] Creating Character: {data}")
-    user = save_identity(data['name'], data['profession'], data['quest'])
-    emit('auth_success', user)
+    save_identity(data['name'], data['profession'], data['quest'])
+    emit('auth_success', load_identity())
 
-# --- CORE LOGIC: PROCESS ANY INPUT ---
-def process_activity(url, title, source="SINGLE"):
-    global is_recovery_mode, last_category
+# --- MAIN LOGIC ---
+def process_logic(tabs_list):
+    global is_recovery_mode, last_category, last_label
 
-    # 1. JUDGE
-    category, label = judge_activity(url, title) 
-    category = category.upper() # PRODUCTIVE, DISTRACTION, NEUTRAL
+    # 1. GOD VIEW SCAN
+    has_distraction = False
+    has_productive = False
+    target_url = ""
+    active_display = "Idle"
+
+    # Find what user is looking at (for display)
+    active_tab = next((t for t in tabs_list if t['active']), tabs_list[0])
+    _, active_display = judge_activity(active_tab['url'], active_tab['title'])
     
-    # 2. ECONOMY (2 seconds per tick)
-    balance, change = process_transaction(category, 2)
+    # Priority Scan
+    for tab in tabs_list:
+        cat, _ = judge_activity(tab['url'], tab['title'])
+        if cat.lower() == "distraction": 
+            has_distraction = True
+            active_display = "DISTRACTION DETECTED"
+        if cat.lower() == "productive": 
+            has_productive = True
+            if not target_url: target_url = tab['url'] # Grab productive URL for quest check
 
-    # 3. RECOVERY LOGIC
+    # 2. DECISION ENGINE
+    final_category = "NEUTRAL"
+    balance = 0
+    change = 0
+
+    if has_distraction:
+        final_category = "DISTRACTION"
+        balance, change = process_transaction("DISTRACTION", 2)
+        
+    elif has_productive:
+        final_category = "PRODUCTIVE"
+        
+        # --- QUEST CHECK ---
+        q_reward, q_msg = update_quest_progress(target_url, 2)
+        
+        if q_msg == "FREE_FLOW":
+            # All quests done -> Standard Pay
+            active_display = "✨ FREE FLOW: " + active_display
+            balance, change = process_transaction("PRODUCTIVE", 2)
+            
+        elif q_msg == "NO_QUEST_MATCH":
+            # Productive, but NOT in Queue -> No Pay!
+            active_display = "⚠️ QUEUE BLOCKED: " + active_display
+            balance, change = process_transaction("NEUTRAL", 2) # Cost of idling
+            
+        else:
+            # Working on Quest -> Progressing...
+            active_display = q_msg
+            if q_reward > 0:
+                # Quest Completed!
+                balance, change = process_transaction("PRODUCTIVE", 0, bonus=q_reward)
+                speak(f"Quest Completed. {q_reward} credits earned.")
+            else:
+                # Just progress, small maintenance cost
+                balance, change = process_transaction("NEUTRAL", 2)
+
+    else:
+        # Neutral/Idle
+        balance, change = process_transaction("NEUTRAL", 2)
+
+    # 3. RECOVERY
     if balance <= 0: is_recovery_mode = True
     elif balance >= 100: is_recovery_mode = False
 
-    # 4. EMIT TO HUD
+    # 4. EMIT
+    # 1. Load the latest quest data
+    quest_data = load_quests()
+    current_quests = quest_data.get("quests", [])
+
+    # 2. Add 'quests' to the emission
     socketio.emit('status_update', {
-        'status': category,
-        'domain': label,
+        'status': final_category,
+        'domain': active_display,
         'balance': int(balance),
         'change': int(change),
-        'locked': is_recovery_mode
+        'locked': is_recovery_mode,
+        'quests': current_quests  # <--- NEW FIELD
     })
 
-    # 5. CONSOLE LOGGING (Only if status changes)
-    if category != last_category:
-        timestamp = datetime.now().strftime("%H:%M:%S")
-        print(f"[{source}] {timestamp} -> {category}: {label} (Bal: {int(balance)})")
-        last_category = category
-
-    # 6. PUNISHMENT
-    if category == "DISTRACTION" and is_recovery_mode:
-        print(f"\033[91m[PUNISH] Bankruptcy! Killing Browser.\033[0m")
+    # 5. PUNISH
+    if final_category == "DISTRACTION" and is_recovery_mode:
         mute_system_volume()
         kill_browser()
-        speak(f"Bankrupt. Earn {100 - int(balance)} credits to unlock.")
+        speak("Bankrupt.")
 
-# --- ENDPOINT 1: OLD EXTENSION (Single Tab) ---
-@app.route('/track', methods=['POST'])
-def track_single():
-    data = request.json
-    url = data.get('url', '')
-    title = data.get('title', '') # Might be empty on old extension
-    if url: process_activity(url, title, source="SINGLE")
-    return {"status": "logged"}
+    # 6. LOGGING
+    if final_category != last_category or active_display != last_label:
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        print(f"[QUEST] {timestamp} | {final_category} -> {active_display}")
+        last_category = final_category
+        last_label = active_display
 
-# --- ENDPOINT 2: NEW EXTENSION (Batch / God View) ---
 @app.route('/track_batch', methods=['POST'])
 def track_batch():
     data = request.json
-    tabs = data.get('tabs', [])
-    if not tabs: return {"status": "ignored"}
+    return {"status": "processed"} if not data else (process_logic(data.get('tabs', [])), {"status": "ok"})[1]
 
-    # God View Logic: Find the worst tab
-    target_url = ""
-    target_title = ""
-    has_distraction = False
-    
-    for tab in tabs:
-        # Check every tab to find a distraction
-        cat, _ = judge_activity(tab['url'], tab['title'])
-        if cat.lower() == "distraction":
-            has_distraction = True
-            target_url = tab['url']   # Lock onto the bad tab
-            target_title = tab['title']
-            break # Found one, that's enough to punish
-    
-    # If no distraction, just use the active tab
-    if not has_distraction:
-        active = next((t for t in tabs if t['active']), tabs[0])
-        target_url = active['url']
-        target_title = active['title']
-
-    process_activity(target_url, target_title, source="BATCH")
-    return {"status": "processed"}
+# Legacy Support
+@app.route('/track', methods=['POST'])
+def track_legacy():
+    data = request.json
+    fake_list = [{'url': data.get('url'), 'title': data.get('title', ''), 'active': True}]
+    process_logic(fake_list)
+    return {"status": "logged"}
 
 def start_server():
-    print("--- SERVER STARTED on PORT 5000 ---")
-    print("Waiting for Chrome Extension data...")
     server_thread = threading.Thread(target=lambda: socketio.run(app, port=5000, debug=False, use_reloader=False))
     server_thread.daemon = True
     server_thread.start()

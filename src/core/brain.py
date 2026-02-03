@@ -10,10 +10,10 @@ from identity import load_identity
 client = Groq(api_key=GROQ_API_KEY)
 
 def load_data(file_path):
-    if not os.path.exists(file_path): return {} if "cache" in file_path else []
+    if not os.path.exists(file_path): return []
     try: 
         with open(file_path, 'r') as f: return json.load(f)
-    except: return {} if "cache" in file_path else []
+    except: return []
 
 def save_data(file_path, data):
     with open(file_path, 'w') as f: json.dump(data, f, indent=4)
@@ -116,34 +116,36 @@ def ask_katya(user_input):
         return reply
     except: return "Connection lost."
 
-def judge_activity(url, title): # Renamed from judge_activity to judge_activity
+def judge_activity(url, title):
     user = load_identity()
     profession = user.get("profession", "Novice").lower()
     
     clean_url = url.replace("https://", "").replace("http://", "").lower()
     clean_title = title.lower() if title else ""
 
-    # 1. PROFESSION-BASED WHITELIST (Hardcoded Rules)
+    # --- RULE 1: ABSOLUTE WHITELIST (Overrides everything) ---
+    # Fixes the "Localhost Drain" issue immediately
+    if "localhost" in clean_url or "127.0.0.1" in clean_url:
+        return "productive", "Local Development"
+
+    if "github.com" in clean_url or "stackoverflow.com" in clean_url:
+        return "productive", "Coding Resource"
+
+    # --- RULE 2: YOUTUBE CONTEXT ---
+    if "youtube.com" in clean_url:
+        productive_keywords = ["tutorial", "course", "python", "react", "coding", "math", "lecture"]
+        if any(k in clean_title for k in productive_keywords):
+            return "productive", f"Learning: {clean_title[:15]}..."
+        return "distraction", "YouTube Leisure"
+
+    # --- RULE 3: PROFESSION SPECIFIC ---
     if "content creator" in profession or "artist" in profession:
         if "instagram.com" in clean_url or "pinterest.com" in clean_url:
-            return "productive", "Market Research"
-            
-    if "developer" in profession:
-        if "github.com" in clean_url or "stackoverflow.com" in clean_url or "localhost" in clean_url:
-            return "productive", "Coding"
+            return "productive", "Research"
 
-    # 2. YOUTUBE CONTEXT ANALYSIS (The "Smart" Judge)
-    if "youtube.com" in clean_url:
-        # If title indicates learning, let it pass
-        productive_keywords = ["tutorial", "course", "lecture", "python", "react", "coding", "math"]
-        if any(k in clean_title for k in productive_keywords):
-            return "productive", f"Learning: {clean_title[:20]}..."
-        else:
-            return "distraction", "YouTube Leisure"
+    # --- RULE 4: OBVIOUS DISTRACTIONS ---
+    distractions = ["netflix", "hulu", "steam", "game", "twitter", "x.com", "instagram", "facebook"]
+    if any(d in clean_url for d in distractions):
+        return "distraction", clean_url
 
-    # 3. FALLBACK: AI JUDGMENT (For unknown sites)
-    # (Use your existing AI cache logic here, but pass the Title too for better context)
-    # ... keep your existing cache/groq logic here ...
-    
-    # Temporary fallback for this snippet:
     return "neutral", clean_url

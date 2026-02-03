@@ -1,0 +1,39 @@
+{
+  "date": "2025-02-02",
+  "quests": [
+    {
+      "id": "q1",
+      "title": "Update LinkedIn Profile",
+      "description": "Fix bio and add 2 skills.",
+      "priority": "HIGH",
+      "keywords": ["linkedin.com/in", "linkedin.com/profile"],
+      "target_minutes": 10,
+      "current_minutes": 0,
+      "completed": false,
+      "reward": 100
+    },
+    {
+      "id": "q2",
+      "title": "Job Applications",
+      "description": "Apply to 3 companies.",
+      "priority": "HIGH",
+      "keywords": ["linkedin.com/jobs", "naukri.com", "instahyre.com", "glassdoor.com"],
+      "target_minutes": 20,
+      "current_minutes": 0,
+      "completed": false,
+      "reward": 300
+    },
+    {
+      "id": "q3",
+      "title": "Deep Work: Project",
+      "description": "Code the Backend Logic.",
+      "priority": "MEDIUM",
+      "keywords": ["localhost", "github.com", "stackoverflow.com"],
+      "target_minutes": 60,
+      "current_minutes": 0,
+      "completed": false,
+      "reward": 500
+    }
+  ],
+  "all_complete": false
+}
