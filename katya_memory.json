@@ -1,20 +1,5 @@
 [
     {
-        "time": "2026-01-19 23:35:36.990065",
-        "user": "what are you thinking?",
-        "katya": "I'm just here to help and listen, so feel free to share whatever's on your mind."
-    },
-    {
-        "time": "2026-01-19 23:35:49.849488",
-        "user": "what are you doing, patio?",
-        "katya": "I'm here and ready to chat with you whenever you need advice or just someone to talk to."
-    },
-    {
-        "time": "2026-01-19 23:36:02.905792",
-        "user": "what do you do?",
-        "katya": "I'm here to assist and chat with you, providing helpful information and listening to whatever's on your mind."
-    },
-    {
         "time": "2026-01-19 23:36:16.815374",
         "user": "what's your name?",
         "katya": "My name is Katya, and I'm here to help and chat with you."
@@ -48,5 +33,20 @@
         "time": "2026-02-01 06:29:43.426520",
         "user": "hello, god",
         "katya": "That's a beautiful and simple greeting - what's been on your mind that's led you to say hello to a higher power?"
+    },
+    {
+        "time": "2026-02-03 11:52:55.681452",
+        "user": "governor \u00e1 tradd\u00e6r og \u00fe\u00fa stj\u00f3\u00e6r a\u00f0 ekki k sabbathj\u00f3sk \u0432\u043e\u00f0ra",
+        "katya": "That's a very unique phrase, but I'm not sure I understand its meaning - could you please help me translate it or give more context about what you're referring to?"
+    },
+    {
+        "time": "2026-02-03 11:53:12.827518",
+        "user": "heika, hva\u00f0 er \u00fe\u00fa?",
+        "katya": "I'm a friendly AI assistant here to help you with any questions or topics you'd like to discuss, and I'm doing great, thanks for asking!"
+    },
+    {
+        "time": "2026-02-03 11:53:29.137921",
+        "user": "oh, what are you doing?",
+        "katya": "I'm just chatting with you and responding to your questions and topics, trying to learn more about what's on your mind."
     }
 ]

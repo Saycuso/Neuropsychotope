@@ -8,7 +8,7 @@ ECONOMY_FILE = "user_economy.json"
 RATES = {
     "PRODUCTIVE": 10,   # Earn 10 credits per minute (Base Wage)
     "DISTRACTION": -30, # Cost 30 credits per minute
-    "NEUTRAL": -1       # Cost 1 credit per minute
+    "NEUTRAL": 0       # Cost 1 credit per minute
 }
 
 DEFAULT_STATE = {
