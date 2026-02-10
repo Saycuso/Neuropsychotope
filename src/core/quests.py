@@ -1,156 +1,114 @@
-import time
-import threading
-import logging
-from flask import Flask, request
-from flask_socketio import SocketIO, emit
+import json
+import os
 from datetime import datetime
 
-# IMPORTS
-try:
-    from brain import judge_activity
-    from system_control import mute_system_volume, kill_browser
-    from audio_engine import speak
-    from identity import load_identity, save_identity 
-    from economy import process_transaction 
-    from quests import update_quest_progress, load_quests
-except ImportError as e:
-    print(f"[CRITICAL] Missing: {e}")
-    exit()
+QUEST_FILE = "daily_quests.json"
 
-app = Flask(__name__)
-app.config['SECRET_KEY'] = 'katya_secret'
-socketio = SocketIO(app, cors_allowed_origins="*")
-log = logging.getLogger('werkzeug'); log.setLevel(logging.ERROR)
+# --- HELPER: Generates a Fresh Plan for TODAY ---
+def get_default_plan():
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    return {
+        "date": today_str,
+        "quests": [
+            {
+                "id": "q1",
+                "title": "Update LinkedIn",
+                "priority": "HIGH",
+                "keywords": ["linkedin.com/in", "linkedin.com/profile"],
+                "target_minutes": 5,
+                "current_minutes": 0,
+                "completed": False,
+                "reward": 100
+            },
+            {
+                "id": "q2",
+                "title": "Job Applications",
+                "priority": "HIGH",
+                "keywords": ["linkedin.com/jobs", "naukri.com", "instahyre.com"],
+                "target_minutes": 15,
+                "current_minutes": 0,
+                "completed": False,
+                "reward": 300
+            },
+            {
+                "id": "q3",
+                "title": "Deep Work: Project",
+                "priority": "MEDIUM",
+                "keywords": ["localhost", "github.com", "stackoverflow.com"],
+                "target_minutes": 60,
+                "current_minutes": 0,
+                "completed": False,
+                "reward": 500
+            }
+        ],
+        "all_complete": False
+    }
 
-is_recovery_mode = False 
-last_category = None
-last_label = None
+def save_quests(data):
+    with open(QUEST_FILE, 'w') as f: json.dump(data, f, indent=4)
 
-@app.route('/')
-def index(): return "Katya Neural Link Active"
-
-# --- HUD ---
-@socketio.on('connect')
-def handle_connect():
-    print("[UI] HUD Connected")
-    user = load_identity()
-    if user["is_initialized"]: emit('auth_success', user)
-    else: emit('trigger_setup', {"message": "IDENTITY_NOT_FOUND"})
-
-@socketio.on('create_identity')
-def handle_creation(data):
-    save_identity(data['name'], data['profession'], data['quest'])
-    emit('auth_success', load_identity())
-
-# --- MAIN LOGIC ---
-def process_logic(tabs_list):
-    global is_recovery_mode, last_category, last_label
-
-    # 1. GOD VIEW SCAN
-    has_distraction = False
-    has_productive = False
-    target_url = ""
-    active_display = "Idle"
-
-    active_tab = next((t for t in tabs_list if t['active']), tabs_list[0])
-    _, active_display = judge_activity(active_tab['url'], active_tab['title'])
+def load_quests():
+    # 1. If file missing, create fresh plan
+    if not os.path.exists(QUEST_FILE):
+        new_plan = get_default_plan()
+        save_quests(new_plan)
+        return new_plan
     
-    for tab in tabs_list:
-        cat, _ = judge_activity(tab['url'], tab['title'])
-        if cat.lower() == "distraction": 
-            has_distraction = True
-            active_display = "DISTRACTION DETECTED"
-        if cat.lower() == "productive": 
-            has_productive = True
-            if not target_url: target_url = tab['url']
+    try:
+        with open(QUEST_FILE, 'r') as f: 
+            data = json.load(f)
 
-    # 2. DECISION ENGINE
-    final_category = "NEUTRAL"
-    balance = 0
-    change = 0
+        # 2. DATE CHECK (The Fix)
+        # Does the file's date match Today?
+        today_str = datetime.now().strftime("%Y-%m-%d")
+        
+        if data.get("date") != today_str:
+            print(f"[QUESTS] New Day Detected ({today_str}). Resetting Protocol...")
+            # It's a new day! WIPE IT.
+            fresh_plan = get_default_plan()
+            save_quests(fresh_plan)
+            return fresh_plan
 
-    if has_distraction:
-        final_category = "DISTRACTION"
-        balance, change = process_transaction("DISTRACTION", 2)
+        return data
+
+    except:
+        # If file is corrupt, reset
+        return get_default_plan()
+
+def update_quest_progress(url, duration_seconds):
+    data = load_quests()
+    
+    # 1. Find the FIRST incomplete quest (Strict Mode)
+    current_priority = next((q for q in data["quests"] if not q["completed"]), None)
+    
+    # If no incomplete quests found, we are Free!
+    if not current_priority:
+        # Double check if flag is set, if not set it
+        if not data.get("all_complete"):
+            data["all_complete"] = True 
+            save_quests(data)
+        return 0, "FREE_FLOW"
+
+    clean_url = url.lower()
+
+    # 2. STRICT CHECK: Are you working on the PRIORITY?
+    if any(k in clean_url for k in current_priority["keywords"]):
+        # MATCH!
+        minutes_added = duration_seconds / 60.0
+        current_priority["current_minutes"] += minutes_added
         
-    elif has_productive:
-        final_category = "PRODUCTIVE"
+        reward = 0
+        message = f"QUEST: {current_priority['title']} ({int(current_priority['current_minutes'])}/{current_priority['target_minutes']}m)"
+
+        # Completion Check
+        if current_priority["current_minutes"] >= current_priority["target_minutes"]:
+            current_priority["completed"] = True
+            reward = current_priority["reward"]
+            message = f"🏆 UNLOCKED NEXT: {current_priority['title']} Done! (+{reward})"
         
-        # --- QUEST CHECK ---
-        q_reward, q_msg = update_quest_progress(target_url, 2)
-        
-        if q_msg == "FREE_FLOW":
-            # All quests done -> Standard Pay
-            active_display = "✨ FREE FLOW: " + active_display
-            balance, change = process_transaction("PRODUCTIVE", 2)
-            
-        elif "BLOCKED" in q_msg or q_msg == "NO_QUEST_MATCH":
-            # Queue Blocked -> Small Penalty (Idling cost)
-            active_display = "⚠️ " + q_msg
-            balance, change = process_transaction("NEUTRAL", 2) 
-            
-        else:
-            # Working on Quest -> Progressing...
-            active_display = q_msg
-            if q_reward > 0:
-                # Quest Completed!
-                balance, change = process_transaction("PRODUCTIVE", 0, bonus=q_reward)
-                speak(f"Quest Completed. {q_reward} credits earned.")
-            else:
-                # Working hard -> NO COST (Flat Balance)
-                # This fixes the "Gradual Decrease" bug
-                balance, change = process_transaction("QUEST_ACTIVE", 2) 
+        save_quests(data)
+        return reward, message
 
     else:
-        # Neutral/Idle
-        balance, change = process_transaction("NEUTRAL", 2)
-
-    # 3. RECOVERY
-    if balance <= 0: is_recovery_mode = True
-    elif balance >= 100: is_recovery_mode = False
-
-    # 4. EMIT
-    quest_data = load_quests()
-    current_quests = quest_data.get("quests", [])
-
-    socketio.emit('status_update', {
-        'status': final_category,
-        'domain': active_display,
-        'balance': int(balance),
-        'change': int(change),
-        'locked': is_recovery_mode,
-        'quests': current_quests
-    })
-
-    # 5. PUNISH
-    if final_category == "DISTRACTION" and is_recovery_mode:
-        mute_system_volume()
-        kill_browser()
-        speak("Bankrupt.")
-
-    # 6. LOGGING
-    if final_category != last_category or active_display != last_label:
-        timestamp = datetime.now().strftime("%H:%M:%S")
-        print(f"[QUEST] {timestamp} | {final_category} -> {active_display}")
-        last_category = final_category
-        last_label = active_display
-
-@app.route('/track_batch', methods=['POST'])
-def track_batch():
-    data = request.json
-    return {"status": "processed"} if not data else (process_logic(data.get('tabs', [])), {"status": "ok"})[1]
-
-@app.route('/track', methods=['POST'])
-def track_legacy():
-    data = request.json
-    fake_list = [{'url': data.get('url'), 'title': data.get('title', ''), 'active': True}]
-    process_logic(fake_list)
-    return {"status": "logged"}
-
-def start_server():
-    server_thread = threading.Thread(target=lambda: socketio.run(app, port=5000, debug=False, use_reloader=False))
-    server_thread.daemon = True
-    server_thread.start()
-
-if __name__ == "__main__":
-    start_server()
+        # 3. BLOCK LOGIC
+        return 0, f"⛔ BLOCKED: Finish '{current_priority['title']}' First!"

@@ -15,7 +15,10 @@ function App() {
     status: "IDLE", 
     locked: false,
     domain: "SYSTEM READY",
-    quests: [] 
+    quests: [],
+    xp: 0,
+    level: 1,
+    next_level_xp: 500
   });
 
   useEffect(() => {
@@ -32,7 +35,10 @@ function App() {
         status: data.status,
         locked: data.locked,
         domain: data.domain,
-        quests: data.quests || [] 
+        quests: data.quests || [],
+        xp: data.xp || 0,
+        level: data.level || 1,
+        next_level_xp: data.next_level_xp || 1000
       });
     });
 
@@ -66,6 +72,9 @@ function App() {
     const isLocked = economy.locked;
     const isSpending = economy.change < 0;
     const themeColor = isLocked ? "#ff0000" : (isSpending ? "#ffaa00" : "#00f3ff");
+    
+    // XP CALCULATION
+    const xpPercent = Math.min(100, (economy.xp / economy.next_level_xp) * 100);
 
     return (
       <div style={{
@@ -80,11 +89,18 @@ function App() {
       }}>
         
         {/* HEADER */}
-        <div style={{display: "flex", justifyContent: "space-between", borderBottom: `1px solid ${themeColor}50`, paddingBottom: "10px"}}>
-          <div>
+        <div style={{display: "flex", justifyContent: "space-between", alignItems: "flex-end", borderBottom: `1px solid ${themeColor}50`, paddingBottom: "10px"}}>
+          <div style={{width: "60%"}}>
             <div style={{fontSize: "10px", opacity: 0.7}}>OPERATIVE</div>
-            <div style={{fontWeight: "bold"}}>{user.name}</div>
+            <div style={{fontWeight: "bold", fontSize: "18px"}}>{user.name} <span style={{fontSize: "12px", background: themeColor, color: "black", padding: "2px 6px", borderRadius: "4px"}}>LVL {economy.level}</span></div>
+            
+            {/* XP BAR */}
+            <div style={{marginTop: "8px", background: "#333", height: "6px", width: "100%", borderRadius: "3px", overflow: "hidden"}}>
+                <div style={{width: `${xpPercent}%`, background: themeColor, height: "100%", transition: "width 0.5s ease"}}></div>
+            </div>
+            <div style={{fontSize: "9px", textAlign: "right", marginTop: "2px", opacity: 0.7}}>{economy.xp} / {economy.next_level_xp} XP</div>
           </div>
+          
           <div style={{textAlign: "right"}}>
             <div style={{fontSize: "10px", opacity: 0.7}}>CREDITS</div>
             <div style={{fontSize: "24px", fontWeight: "bold", textShadow: `0 0 10px ${themeColor}`}}>
@@ -93,8 +109,8 @@ function App() {
           </div>
         </div>
 
-        {/* --- RESTORED: MAIN QUEST GOAL --- */}
-        <div style={{textAlign: "center", marginTop: "20px"}}>
+        {/* RESTORED: MAIN QUEST GOAL */}
+        <div style={{textAlign: "center", marginTop: "30px"}}>
            <div style={{fontSize: "10px", letterSpacing: "2px", opacity: 0.7}}>CURRENT OBJECTIVE</div>
            <div style={{fontSize: "22px", marginTop: "5px", textTransform: "uppercase", textShadow: `0 0 5px ${themeColor}`}}>
              {user.main_quest || user.quest} 
@@ -102,7 +118,7 @@ function App() {
         </div>
 
         {/* CURRENT SIGNAL (Status) */}
-        <div style={{margin: "20px 0", textAlign: "center", padding: "10px", border: `1px dashed ${themeColor}50`}}>
+        <div style={{margin: "20px 0", textAlign: "center", padding: "15px", border: `1px dashed ${themeColor}50`, background: `${themeColor}05`}}>
            <div style={{fontSize: "10px", letterSpacing: "2px", opacity: 0.7}}>NEURAL FEED</div>
            <div style={{fontSize: "18px", marginTop: "5px", fontWeight: "bold"}}>{economy.domain}</div>
            <div style={{fontSize: "12px", marginTop: "5px", opacity: 0.8}}>

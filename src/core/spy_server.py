@@ -11,8 +11,8 @@ try:
     from system_control import mute_system_volume, kill_browser
     from audio_engine import speak
     from identity import load_identity, save_identity 
-    from economy import process_transaction 
-    from quests import update_quest_progress, load_quests # <--- NEW IMPORT
+    from economy import process_transaction, calculate_level_threshold
+    from quests import update_quest_progress, load_quests
 except ImportError as e:
     print(f"[CRITICAL] Missing: {e}")
     exit()
@@ -25,6 +25,9 @@ log = logging.getLogger('werkzeug'); log.setLevel(logging.ERROR)
 is_recovery_mode = False 
 last_category = None
 last_label = None
+
+# --- NEW: MULTI-BROWSER MEMORY ---
+active_streams = {} # Stores tabs from different browsers
 
 @app.route('/')
 def index(): return "Katya Neural Link Active"
@@ -46,34 +49,47 @@ def handle_creation(data):
 def process_logic(tabs_list):
     global is_recovery_mode, last_category, last_label
 
-    # 1. GOD VIEW SCAN
     has_distraction = False
     has_productive = False
     target_url = ""
     active_display = "Idle"
 
-    # Find what user is looking at (for display)
-    active_tab = next((t for t in tabs_list if t['active']), tabs_list[0])
-    _, active_display = judge_activity(active_tab['url'], active_tab['title'])
+    # MERGED LOGIC: Check ALL tabs from ALL browsers
+    # We prioritize finding a "meaningful" active tab for display
+    priority_tab = None
     
-    # Priority Scan
     for tab in tabs_list:
-        cat, _ = judge_activity(tab['url'], tab['title'])
+        cat, label = judge_activity(tab['url'], tab['title'])
+        
+        # 1. Update Global Status
         if cat.lower() == "distraction": 
             has_distraction = True
-            active_display = "DISTRACTION DETECTED"
+            priority_tab = tab # Show the distraction
         if cat.lower() == "productive": 
             has_productive = True
-            if not target_url: target_url = tab['url'] # Grab productive URL for quest check
+            if not target_url: target_url = tab['url']
+            if not has_distraction: priority_tab = tab # Show work if not distracted
+        
+        # Default display if nothing special found
+        if tab['active'] and not priority_tab:
+            priority_tab = tab
+
+    # Set the display label based on the priority tab found
+    if priority_tab:
+        _, active_display = judge_activity(priority_tab['url'], priority_tab['title'])
+        if has_distraction: active_display = "DISTRACTION DETECTED"
 
     # 2. DECISION ENGINE
     final_category = "NEUTRAL"
     balance = 0
     change = 0
+    xp = 0
+    level = 1
+    levelup_bonus = 0
 
     if has_distraction:
         final_category = "DISTRACTION"
-        balance, change = process_transaction("DISTRACTION", 2)
+        balance, change, xp, level, levelup_bonus = process_transaction("DISTRACTION", 2)
         
     elif has_productive:
         final_category = "PRODUCTIVE"
@@ -82,56 +98,54 @@ def process_logic(tabs_list):
         q_reward, q_msg = update_quest_progress(target_url, 2)
         
         if q_msg == "FREE_FLOW":
-            # All quests done -> Standard Pay
             active_display = "✨ FREE FLOW: " + active_display
-            balance, change = process_transaction("PRODUCTIVE", 2)
+            balance, change, xp, level, levelup_bonus = process_transaction("PRODUCTIVE", 2)
             
-        elif q_msg == "NO_QUEST_MATCH":
-            # Productive, but NOT in Queue -> No Pay!
-            active_display = "⚠️ QUEUE BLOCKED: " + active_display
-            balance, change = process_transaction("NEUTRAL", 2) # Cost of idling
+        elif "BLOCKED" in q_msg or q_msg == "NO_QUEST_MATCH":
+            active_display = "⚠️ " + q_msg
+            balance, change, xp, level, levelup_bonus = process_transaction("NEUTRAL", 2) 
             
         else:
-            # Working on Quest -> Progressing...
             active_display = q_msg
             if q_reward > 0:
-                # Quest Completed!
-                balance, change = process_transaction("PRODUCTIVE", 0, bonus=q_reward)
-                speak(f"Quest Completed. {q_reward} credits earned.")
+                balance, change, xp, level, levelup_bonus = process_transaction("PRODUCTIVE", 0, bonus=q_reward)
+                speak(f"Quest Complete. {q_reward} credits earned.")
             else:
-                # Just progress, small maintenance cost
-                balance, change = process_transaction("NEUTRAL", 2)
+                balance, change, xp, level, levelup_bonus = process_transaction("QUEST_ACTIVE", 2) 
 
     else:
-        # Neutral/Idle
-        balance, change = process_transaction("NEUTRAL", 2)
+        balance, change, xp, level, levelup_bonus = process_transaction("NEUTRAL", 2)
 
-    # 3. RECOVERY
+    # LEVEL UP ANNOUNCEMENT
+    if levelup_bonus > 0:
+        speak(f"Level Up! You are now Level {level}. {levelup_bonus} credits awarded.")
+        active_display = f"🌟 LEVEL UP! (+{levelup_bonus})"
+
     if balance <= 0: is_recovery_mode = True
     elif balance >= 100: is_recovery_mode = False
 
-    # 4. EMIT
-    # 1. Load the latest quest data
     quest_data = load_quests()
-    current_quests = quest_data.get("quests", [])
-
-    # 2. Add 'quests' to the emission
+    
+    # Calculate XP Progress for Frontend
+    next_xp_goal = calculate_level_threshold(level)
+    
     socketio.emit('status_update', {
         'status': final_category,
         'domain': active_display,
-        'balance': int(balance),
-        'change': int(change),
+        'balance': balance,
+        'change': change,
         'locked': is_recovery_mode,
-        'quests': current_quests  # <--- NEW FIELD
+        'quests': quest_data.get("quests", []),
+        'xp': xp,                
+        'level': level,          
+        'next_level_xp': next_xp_goal 
     })
 
-    # 5. PUNISH
     if final_category == "DISTRACTION" and is_recovery_mode:
         mute_system_volume()
         kill_browser()
         speak("Bankrupt.")
 
-    # 6. LOGGING
     if final_category != last_category or active_display != last_label:
         timestamp = datetime.now().strftime("%H:%M:%S")
         print(f"[QUEST] {timestamp} | {final_category} -> {active_display}")
@@ -141,14 +155,46 @@ def process_logic(tabs_list):
 @app.route('/track_batch', methods=['POST'])
 def track_batch():
     data = request.json
-    return {"status": "processed"} if not data else (process_logic(data.get('tabs', [])), {"status": "ok"})[1]
+    if not data: return {"status": "ignored"}
 
-# Legacy Support
+    # 1. IDENTIFY THE SOURCE
+    client_id = data.get('client_id', 'unknown')
+    
+    # 2. UPDATE STREAM MEMORY
+    active_streams[client_id] = {
+        'tabs': data.get('tabs', []),
+        'ts': time.time()
+    }
+
+    # 3. MERGE ALL ACTIVE STREAMS
+    merged_tabs = []
+    cleanup_ids = []
+    now = time.time()
+
+    for cid, stream in active_streams.items():
+        # If stream is older than 5 seconds, it's dead (browser closed)
+        if now - stream['ts'] > 5:
+            cleanup_ids.append(cid)
+        else:
+            merged_tabs.extend(stream['tabs'])
+    
+    # Clean old streams
+    for cid in cleanup_ids:
+        del active_streams[cid]
+
+    # 4. PROCESS THE COMBINED REALITY
+    process_logic(merged_tabs)
+    
+    return {"status": "ok"}
+
 @app.route('/track', methods=['POST'])
 def track_legacy():
+    # Legacy support for old extension versions (treats as unique stream)
     data = request.json
     fake_list = [{'url': data.get('url'), 'title': data.get('title', ''), 'active': True}]
-    process_logic(fake_list)
+    # We pipe this into track_batch logic essentially
+    active_streams['legacy'] = {'tabs': fake_list, 'ts': time.time()}
+    process_logic(fake_list) # Process immediately for legacy
     return {"status": "logged"}
 
 def start_server():

@@ -1,10 +1,5 @@
 [
     {
-        "time": "2026-01-19 23:36:16.815374",
-        "user": "what's your name?",
-        "katya": "My name is Katya, and I'm here to help and chat with you."
-    },
-    {
         "time": "2026-02-01 05:48:49.828396",
         "user": "hey, god damn",
         "katya": "Is everything okay? You seem a bit upset, would you like to talk about what's on your mind?"
@@ -48,5 +43,10 @@
         "time": "2026-02-03 11:53:29.137921",
         "user": "oh, what are you doing?",
         "katya": "I'm just chatting with you and responding to your questions and topics, trying to learn more about what's on your mind."
+    },
+    {
+        "time": "2026-02-10 09:39:14.772955",
+        "user": "okay",
+        "katya": "It looks like we're off to a interesting conversation - where would you like to take it next?"
     }
 ]

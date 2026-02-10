@@ -1,5 +1,5 @@
 {
-    "date": "2025-02-02",
+    "date": "2026-02-10",
     "quests": [
         {
             "id": "q1",
@@ -38,8 +38,8 @@
                 "stackoverflow.com"
             ],
             "target_minutes": 60,
-            "current_minutes": 60.033333333332486,
-            "completed": true,
+            "current_minutes": 0,
+            "completed": false,
             "reward": 500
         }
     ],
