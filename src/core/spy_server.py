@@ -5,16 +5,19 @@ from flask import Flask, request
 from flask_socketio import SocketIO, emit
 from datetime import datetime
 
-# IMPORTS
+# --- FIXED IMPORTS ---
 try:
     from brain import judge_activity
     from system_control import mute_system_volume, kill_browser
     from audio_engine import speak
     from identity import load_identity, save_identity 
-    from economy import process_transaction, calculate_level_threshold
+    # Added load_economy here!
+    from economy import process_transaction, calculate_level_threshold, load_economy 
     from quests import update_quest_progress, load_quests
 except ImportError as e:
-    pass
+    print(f"[CRITICAL] Missing: {e}")
+    # Don't just pass, exit if imports fail so we know what's broken!
+    exit()
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'katya_secret'
@@ -34,9 +37,37 @@ def index(): return "Katya Neural Link Active"
 # --- HUD ---
 @socketio.on('connect')
 def handle_connect():
+    global last_payload
     user = load_identity()
-    if user["is_initialized"]: emit('auth_success', user)
-    else: emit('trigger_setup', {"message": "IDENTITY_NOT_FOUND"})
+    
+    if user.get("is_initialized", False): 
+        emit('auth_success', user)
+        
+        # --- SEND INITIAL STATE IMMEDIATELY ON REFRESH ---
+        if last_payload:
+            # If server already has data, send it instantly
+            emit('status_update', last_payload)
+        else:
+            # If server just started, load directly from files
+            eco = load_economy()  
+            q_data = load_quests()
+            
+            initial_payload = {
+                'status': "NEUTRAL",
+                'domain': "SYSTEM READY",
+                'balance': eco.get("balance", 100),
+                'change': 0,
+                'locked': eco.get("balance", 100) <= 0,
+                'quests': q_data.get("quests", []),
+                'xp': eco.get("xp", 0),                
+                'level': eco.get("level", 1),          
+                'next_level_xp': calculate_level_threshold(eco.get("level", 1)) 
+            }
+            emit('status_update', initial_payload)
+            last_payload = initial_payload
+            
+    else: 
+        emit('trigger_setup', {"message": "IDENTITY_NOT_FOUND"})
 
 @socketio.on('create_identity')
 def handle_creation(data):
@@ -45,24 +76,15 @@ def handle_creation(data):
 
 # --- HELPER: SORT TABS BY IMPORTANCE (Stops Flickering) ---
 def get_highest_priority_tab(tabs_list):
-    """
-    Scans all tabs and picks the 'Best' one.
-    Hierarchy: DISTRACTION > PRODUCTIVE > NEUTRAL.
-    If you have LinkedIn open anywhere, it ignores empty tabs.
-    """
     best_tab = None
     best_score = -1 
 
     for tab in tabs_list:
-        # Filter out inactive tabs if we have multiple
-        # (Optional: You can remove this check if you want background tabs to count)
-        # if not tab.get('active', False) and len(tabs_list) > 1: continue
-
         cat, label = judge_activity(tab['url'], tab['title'])
         
         score = 0
         if cat.lower() == "productive": score = 1
-        if cat.lower() == "distraction": score = 2 # Distractions are highest priority (to catch you)
+        if cat.lower() == "distraction": score = 2 
         
         if score > best_score:
             best_score = score
@@ -103,11 +125,9 @@ def process_logic(tabs_list):
         final_category = "PRODUCTIVE"
         
         # --- SMART QUEST UPDATE ---
-        # We pass 'active_display' (the Label) to Quests so "Job Portal" tag works
         try:
             q_reward, q_msg = update_quest_progress(target_url, 2, active_display)
         except TypeError:
-            # Fallback if quests.py is old
             q_reward, q_msg = update_quest_progress(target_url, 2)
         
         if q_msg == "FREE_FLOW":
@@ -140,7 +160,6 @@ def process_logic(tabs_list):
     next_xp_goal = calculate_level_threshold(level)
     
     # 5. SMART EMIT (Debouncing)
-    # Only send to frontend if something ACTUALLY changed
     current_payload = {
         'status': final_category,
         'domain': active_display,
