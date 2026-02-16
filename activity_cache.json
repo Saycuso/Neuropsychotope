@@ -3,5 +3,9 @@
     "google.com": "neutral",
     "youtube.com": "distraction",
     "gemini.google.com": "neutral",
-    "localhost:5173": "distraction"
+    "localhost:5173": "distraction",
+    "chatgpt.com": "PRODUCTIVE",
+    "linkedin.com": "PRODUCTIVE",
+    "mail.google.com": "PRODUCTIVE",
+    "cutshort.io": "PRODUCTIVE"
 }
