@@ -6,11 +6,14 @@
             "title": "Update LinkedIn",
             "priority": "HIGH",
             "keywords": [
-                "linkedin.com/in",
-                "linkedin.com/profile"
+                "linkedin.com"
+            ],
+            "smart_tags": [
+                "Job Portal",
+                "Career"
             ],
             "target_minutes": 5,
-            "current_minutes": 2.1000000000000023,
+            "current_minutes": 0,
             "completed": false,
             "reward": 100
         },
@@ -19,9 +22,12 @@
             "title": "Job Applications",
             "priority": "HIGH",
             "keywords": [
-                "linkedin.com/jobs",
                 "naukri.com",
-                "instahyre.com"
+                "wellfound.com"
+            ],
+            "smart_tags": [
+                "Job Portal",
+                "Career"
             ],
             "target_minutes": 15,
             "current_minutes": 0,
@@ -36,6 +42,11 @@
                 "localhost",
                 "github.com",
                 "stackoverflow.com"
+            ],
+            "smart_tags": [
+                "Coding Resource",
+                "Local Development",
+                "Dev Tool"
             ],
             "target_minutes": 60,
             "current_minutes": 0,

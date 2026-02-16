@@ -1,15 +1,18 @@
 {
-    "github.com": "productive",
-    "google.com": "neutral",
-    "youtube.com": "distraction",
-    "gemini.google.com": "neutral",
-    "localhost:5173": "distraction",
-    "chatgpt.com": "PRODUCTIVE",
-    "linkedin.com": "PRODUCTIVE",
-    "mail.google.com": "PRODUCTIVE",
-    "cutshort.io": "PRODUCTIVE",
-    "web.whatsapp.com": [
-        "distraction",
-        "Social Media"
+    "gemini.google.com": [
+        "productive",
+        "Coding Resource"
+    ],
+    "chatgpt.com": [
+        "productive",
+        "Coding Resource"
+    ],
+    "google.com": [
+        "neutral",
+        "Browsing"
+    ],
+    "linkedin.com": [
+        "productive",
+        "Job Portal"
     ]
 }
