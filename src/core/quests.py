@@ -4,7 +4,6 @@ from datetime import datetime
 
 QUEST_FILE = "daily_quests.json"
 
-# --- HELPER: Generates a Fresh Plan for TODAY ---
 def get_default_plan():
     today_str = datetime.now().strftime("%Y-%m-%d")
     return {
@@ -14,7 +13,10 @@ def get_default_plan():
                 "id": "q1",
                 "title": "Update LinkedIn",
                 "priority": "HIGH",
-                "keywords": ["linkedin.com/in", "linkedin.com/profile"],
+                # THE FIX: Broadened so ANY linkedin page works
+                "keywords": ["linkedin.com"], 
+                # THE AI LINK: Groq tags
+                "smart_tags": ["Job Portal", "Career"], 
                 "target_minutes": 5,
                 "current_minutes": 0,
                 "completed": False,
@@ -24,7 +26,8 @@ def get_default_plan():
                 "id": "q2",
                 "title": "Job Applications",
                 "priority": "HIGH",
-                "keywords": ["linkedin.com/jobs", "naukri.com", "instahyre.com"],
+                "keywords": ["naukri.com", "wellfound.com"],
+                "smart_tags": ["Job Portal", "Career"],
                 "target_minutes": 15,
                 "current_minutes": 0,
                 "completed": False,
@@ -35,6 +38,7 @@ def get_default_plan():
                 "title": "Deep Work: Project",
                 "priority": "MEDIUM",
                 "keywords": ["localhost", "github.com", "stackoverflow.com"],
+                "smart_tags": ["Coding Resource", "Local Development", "Dev Tool"],
                 "target_minutes": 60,
                 "current_minutes": 0,
                 "completed": False,
@@ -48,7 +52,6 @@ def save_quests(data):
     with open(QUEST_FILE, 'w') as f: json.dump(data, f, indent=4)
 
 def load_quests():
-    # 1. If file missing, create fresh plan
     if not os.path.exists(QUEST_FILE):
         new_plan = get_default_plan()
         save_quests(new_plan)
@@ -58,32 +61,23 @@ def load_quests():
         with open(QUEST_FILE, 'r') as f: 
             data = json.load(f)
 
-        # 2. DATE CHECK (The Fix)
-        # Does the file's date match Today?
         today_str = datetime.now().strftime("%Y-%m-%d")
-        
         if data.get("date") != today_str:
-            print(f"[QUESTS] New Day Detected ({today_str}). Resetting Protocol...")
-            # It's a new day! WIPE IT.
             fresh_plan = get_default_plan()
             save_quests(fresh_plan)
             return fresh_plan
 
         return data
-
     except:
-        # If file is corrupt, reset
         return get_default_plan()
 
-def update_quest_progress(url, duration_seconds):
+# THE AI HOOK: Added 'brain_label' parameter
+def update_quest_progress(url, duration_seconds, brain_label=""):
     data = load_quests()
     
-    # 1. Find the FIRST incomplete quest (Strict Mode)
     current_priority = next((q for q in data["quests"] if not q["completed"]), None)
     
-    # If no incomplete quests found, we are Free!
     if not current_priority:
-        # Double check if flag is set, if not set it
         if not data.get("all_complete"):
             data["all_complete"] = True 
             save_quests(data)
@@ -91,16 +85,23 @@ def update_quest_progress(url, duration_seconds):
 
     clean_url = url.lower()
 
-    # 2. STRICT CHECK: Are you working on the PRIORITY?
-    if any(k in clean_url for k in current_priority["keywords"]):
-        # MATCH!
+    # 1. Check URL
+    url_match = any(k in clean_url for k in current_priority.get("keywords", []))
+    
+    # 2. Check AI Brain Label
+    label_match = False
+    if brain_label:
+        smart_tags = current_priority.get("smart_tags", [])
+        label_match = any(tag.lower() in brain_label.lower() for tag in smart_tags)
+
+    # 3. If either matches, you get paid!
+    if url_match or label_match:
         minutes_added = duration_seconds / 60.0
         current_priority["current_minutes"] += minutes_added
         
         reward = 0
         message = f"QUEST: {current_priority['title']} ({int(current_priority['current_minutes'])}/{current_priority['target_minutes']}m)"
 
-        # Completion Check
         if current_priority["current_minutes"] >= current_priority["target_minutes"]:
             current_priority["completed"] = True
             reward = current_priority["reward"]
@@ -110,5 +111,4 @@ def update_quest_progress(url, duration_seconds):
         return reward, message
 
     else:
-        # 3. BLOCK LOGIC
         return 0, f"⛔ BLOCKED: Finish '{current_priority['title']}' First!"

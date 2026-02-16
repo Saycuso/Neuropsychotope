@@ -1,6 +1,4 @@
-// src/katya_spy/background.js
-
-// Generate a unique ID for this browser instance
+// Generate a unique ID for this specific Chrome profile
 const CLIENT_ID = "agent_" + Math.floor(Math.random() * 1000000);
 
 function reportAllTabs() {
@@ -15,14 +13,14 @@ function reportAllTabs() {
                     active: tab.active 
                 }));
 
-            // SEND TO BATCH ENDPOINT WITH CLIENT ID
+            // SEND TO BATCH ENDPOINT
             if (cleanTabs.length > 0) {
                 fetch('http://127.0.0.1:5000/track_batch', { 
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
                         tabs: cleanTabs,
-                        client_id: CLIENT_ID // <--- NEW: Send ID
+                        client_id: CLIENT_ID // <--- NEW: Send the unique profile ID
                     })
                 }).catch(err => console.log("Katya Offline"));
             }
