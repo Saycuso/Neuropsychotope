@@ -8,9 +8,13 @@
             "keywords": [
                 "linkedin.com"
             ],
+            "smart_tags": [
+                "Job Portal",
+                "Career"
+            ],
             "target_minutes": 5,
-            "current_minutes": 0,
-            "completed": false,
+            "current_minutes": 5.033333333333325,
+            "completed": true,
             "reward": 100
         },
         {
@@ -18,12 +22,15 @@
             "title": "Job Applications",
             "priority": "HIGH",
             "keywords": [
-                "linkedin.com/jobs",
                 "naukri.com",
-                "instahyre.com"
+                "wellfound.com"
+            ],
+            "smart_tags": [
+                "Job Portal",
+                "Career"
             ],
             "target_minutes": 15,
-            "current_minutes": 0,
+            "current_minutes": 0.16666666666666666,
             "completed": false,
             "reward": 300
         },
@@ -33,8 +40,12 @@
             "priority": "MEDIUM",
             "keywords": [
                 "localhost",
-                "github.com",
-                "stackoverflow.com"
+                "github.com"
+            ],
+            "smart_tags": [
+                "Coding Resource",
+                "Local Development",
+                "Dev Tool"
             ],
             "target_minutes": 60,
             "current_minutes": 0,

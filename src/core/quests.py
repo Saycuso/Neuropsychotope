@@ -4,7 +4,6 @@ from datetime import datetime
 
 QUEST_FILE = "daily_quests.json"
 
-# --- HELPER: Generates a Fresh Plan for TODAY ---
 def get_default_plan():
     today_str = datetime.now().strftime("%Y-%m-%d")
     return {
@@ -14,7 +13,8 @@ def get_default_plan():
                 "id": "q1",
                 "title": "Update LinkedIn",
                 "priority": "HIGH",
-                "keywords": ["linkedin.com"],
+                "keywords": ["linkedin.com"], 
+                "smart_tags": ["Job Portal", "Career"], # <--- NEW: Brain Labels accepted
                 "target_minutes": 5,
                 "current_minutes": 0,
                 "completed": False,
@@ -24,7 +24,8 @@ def get_default_plan():
                 "id": "q2",
                 "title": "Job Applications",
                 "priority": "HIGH",
-                "keywords": ["linkedin.com/jobs", "naukri.com", "instahyre.com"],
+                "keywords": ["naukri.com", "wellfound.com"], # Fallbacks
+                "smart_tags": ["Job Portal", "Career"],      # <--- NEW: Accepts ANY job site
                 "target_minutes": 15,
                 "current_minutes": 0,
                 "completed": False,
@@ -34,7 +35,8 @@ def get_default_plan():
                 "id": "q3",
                 "title": "Deep Work: Project",
                 "priority": "MEDIUM",
-                "keywords": ["localhost", "github.com", "stackoverflow.com"],
+                "keywords": ["localhost", "github.com"],
+                "smart_tags": ["Coding Resource", "Local Development", "Dev Tool"],
                 "target_minutes": 60,
                 "current_minutes": 0,
                 "completed": False,
@@ -48,33 +50,21 @@ def save_quests(data):
     with open(QUEST_FILE, 'w') as f: json.dump(data, f, indent=4)
 
 def load_quests():
-    # 1. If file missing, create fresh plan
     if not os.path.exists(QUEST_FILE):
         new_plan = get_default_plan()
         save_quests(new_plan)
         return new_plan
-    
     try:
-        with open(QUEST_FILE, 'r') as f: 
-            data = json.load(f)
-
-        # 2. DATE CHECK (The Fix)
-        # Does the file's date match Today?
+        with open(QUEST_FILE, 'r') as f: data = json.load(f)
         today_str = datetime.now().strftime("%Y-%m-%d")
-        
         if data.get("date") != today_str:
-            print(f"[QUESTS] New Day Detected ({today_str}). Resetting Protocol...")
-            # It's a new day! WIPE IT.
             fresh_plan = get_default_plan()
             save_quests(fresh_plan)
             return fresh_plan
-
         return data
+    except: return get_default_plan()
 
-    except:
-        # If file is corrupt, reset
-        return get_default_plan()
-
+# --- THE UPDATE ---
 def update_quest_progress(url, duration_seconds, brain_label=""):
     data = load_quests()
     
@@ -87,17 +77,18 @@ def update_quest_progress(url, duration_seconds, brain_label=""):
         return 0, "FREE_FLOW"
 
     clean_url = url.lower()
+    
+    # 1. CHECK URL
+    url_match = any(k in clean_url for k in current_priority.get("keywords", []))
+    
+    # 2. CHECK BRAIN LABEL (The Smart AI Match)
+    label_match = False
+    if brain_label:
+        smart_tags = current_priority.get("smart_tags", [])
+        # Check if "Job Portal" is inside the brain label (e.g. "Job Portal: unknown.com")
+        label_match = any(tag.lower() in brain_label.lower() for tag in smart_tags)
 
-    # --- THE BUG KILLER: Fuzzy Match Logic ---
-    # Instead of looking for an exact path match, we just check if the main word
-    # (like "linkedin") exists in whatever URL string got passed here.
-    match_found = any(
-    k in clean_url
-    for k in current_priority.get("keywords", [])
-)
-
-
-    if match_found:
+    if url_match or label_match:
         minutes_added = duration_seconds / 60.0
         current_priority["current_minutes"] += minutes_added
         

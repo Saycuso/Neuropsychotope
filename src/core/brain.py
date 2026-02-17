@@ -18,7 +18,7 @@ client = Groq(api_key=GROQ_API_KEY)
 # --- DATA TOOLS ---
 def load_data(file_path):
     if not os.path.exists(file_path): return []
-    try:
+    try: 
         with open(file_path, 'r') as f: return json.load(f)
     except: return []
 
@@ -98,46 +98,37 @@ def ask_katya(user_input):
 
 # --- SMART CLASSIFIER (NO MORE STATIC LISTS) ---
 def classify_url_via_groq(url, title):
-    # --- HARD OVERRIDE (Safety Net) ---
-    clean_url = url.lower()
-    if "linkedin.com" in clean_url: return "productive", "Job Portal"
-    if "gemini.google.com" in clean_url or "chatgpt.com" in clean_url: return "productive", "Coding Resource"
-
-    print(f"🧠 [KATYA LEARNING] Analyzing: {url}...")
+    print(f"🧠 [KATYA LEARNING] Analyzing new domain: {url}...")
     
-    # --- HARD CONSTRAINT PROMPT ---
+    # We ask Groq to output a SPECIFIC TAG
     prompt = f"""
-    URL: {url} | TITLE: {title}
-    Task: Classify this URL for a Software Engineer.
+    CLASSIFY this website for a Software Engineer.
+    URL: {url}
+    PAGE TITLE: {title}
     
-    Allowed Tags: [JOB_PORTAL, DEV_TOOL, LEARNING, SOCIAL, ENTERTAINMENT, NEUTRAL]
-    
-    Rules:
-    - Respond with ONLY the tag.
-    - No sentences. No punctuation. No explanations.
-    - If unsure, say NEUTRAL.
+    RETURN ONE OF THESE TAGS ONLY:
+    - JOB_PORTAL (LinkedIn, Indeed, Company Careers, Job Boards)
+    - DEV_TOOL (Github, StackOverflow, Docs, Localhost, Tools)
+    - LEARNING (Tutorials, Courses, Articles)
+    - SOCIAL (Facebook, Twitter, Instagram)
+    - ENTERTAINMENT (Netflix, Games, Comics)
+    - NEUTRAL (Search engines, Login pages)
     """
     
     try:
         completion = client.chat.completions.create(
             model="llama-3.1-8b-instant",
-            messages=[
-                {"role": "system", "content": "You are a one-word classification machine. Output only the tag."},
-                {"role": "user", "content": prompt}
-            ], 
-            max_tokens=10, 
-            temperature=0.0
+            messages=[{"role": "user", "content": prompt}], max_tokens=15
         )
+        tag = completion.choices[0].message.content.strip().upper()
         
-        # Clean the response of any accidental dots or spaces
-        raw_tag = "".join(c for c in completion.choices[0].message.content if c.isalnum() or c == '_').upper().strip()
-        print(f"🤖 [GROQ SAID]: '{raw_tag}'") 
+        # MAP TAGS TO PRODUCTIVITY
+        if "JOB_PORTAL" in tag: return "productive", "Job Portal"
+        if "DEV_TOOL" in tag: return "productive", "Coding Resource"
+        if "LEARNING" in tag: return "productive", "Learning"
         
-        if "JOB_PORTAL" in raw_tag: return "productive", "Job Portal"
-        if "DEV_TOOL" in raw_tag: return "productive", "Coding Resource"
-        if "LEARNING" in raw_tag: return "productive", "Learning"
-        if "SOCIAL" in raw_tag: return "distraction", "Social Media"
-        if "ENTERTAINMENT" in raw_tag: return "distraction", "Entertainment"
+        if "SOCIAL" in tag: return "distraction", "Social Media"
+        if "ENTERTAINMENT" in tag: return "distraction", "Entertainment"
         
         return "neutral", "Browsing"
     except Exception as e:
