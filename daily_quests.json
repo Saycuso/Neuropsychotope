@@ -1,16 +1,13 @@
 {
-    "date": "2026-02-16",
+    "date": "2026-02-17",
     "quests": [
         {
             "id": "q1",
             "title": "Update LinkedIn",
             "priority": "HIGH",
             "keywords": [
-                "linkedin.com"
-            ],
-            "smart_tags": [
-                "Job Portal",
-                "Career"
+                "linkedin.com/in",
+                "linkedin.com/profile"
             ],
             "target_minutes": 5,
             "current_minutes": 0,
@@ -22,12 +19,9 @@
             "title": "Job Applications",
             "priority": "HIGH",
             "keywords": [
+                "linkedin.com/jobs",
                 "naukri.com",
-                "wellfound.com"
-            ],
-            "smart_tags": [
-                "Job Portal",
-                "Career"
+                "instahyre.com"
             ],
             "target_minutes": 15,
             "current_minutes": 0,
@@ -42,11 +36,6 @@
                 "localhost",
                 "github.com",
                 "stackoverflow.com"
-            ],
-            "smart_tags": [
-                "Coding Resource",
-                "Local Development",
-                "Dev Tool"
             ],
             "target_minutes": 60,
             "current_minutes": 0,
