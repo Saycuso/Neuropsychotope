@@ -6,8 +6,7 @@
             "title": "Update LinkedIn",
             "priority": "HIGH",
             "keywords": [
-                "linkedin.com/in",
-                "linkedin.com/profile"
+                "linkedin.com"
             ],
             "target_minutes": 5,
             "current_minutes": 0,

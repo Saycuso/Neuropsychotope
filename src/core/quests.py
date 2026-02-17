@@ -14,7 +14,7 @@ def get_default_plan():
                 "id": "q1",
                 "title": "Update LinkedIn",
                 "priority": "HIGH",
-                "keywords": ["linkedin.com/in", "linkedin.com/profile"],
+                "keywords": ["linkedin.com"],
                 "target_minutes": 5,
                 "current_minutes": 0,
                 "completed": False,
@@ -75,15 +75,12 @@ def load_quests():
         # If file is corrupt, reset
         return get_default_plan()
 
-def update_quest_progress(url, duration_seconds):
+def update_quest_progress(url, duration_seconds, brain_label=""):
     data = load_quests()
     
-    # 1. Find the FIRST incomplete quest (Strict Mode)
     current_priority = next((q for q in data["quests"] if not q["completed"]), None)
     
-    # If no incomplete quests found, we are Free!
     if not current_priority:
-        # Double check if flag is set, if not set it
         if not data.get("all_complete"):
             data["all_complete"] = True 
             save_quests(data)
@@ -91,16 +88,22 @@ def update_quest_progress(url, duration_seconds):
 
     clean_url = url.lower()
 
-    # 2. STRICT CHECK: Are you working on the PRIORITY?
-    if any(k in clean_url for k in current_priority["keywords"]):
-        # MATCH!
+    # --- THE BUG KILLER: Fuzzy Match Logic ---
+    # Instead of looking for an exact path match, we just check if the main word
+    # (like "linkedin") exists in whatever URL string got passed here.
+    match_found = any(
+    k in clean_url
+    for k in current_priority.get("keywords", [])
+)
+
+
+    if match_found:
         minutes_added = duration_seconds / 60.0
         current_priority["current_minutes"] += minutes_added
         
         reward = 0
         message = f"QUEST: {current_priority['title']} ({int(current_priority['current_minutes'])}/{current_priority['target_minutes']}m)"
 
-        # Completion Check
         if current_priority["current_minutes"] >= current_priority["target_minutes"]:
             current_priority["completed"] = True
             reward = current_priority["reward"]
@@ -110,5 +113,4 @@ def update_quest_progress(url, duration_seconds):
         return reward, message
 
     else:
-        # 3. BLOCK LOGIC
         return 0, f"⛔ BLOCKED: Finish '{current_priority['title']}' First!"

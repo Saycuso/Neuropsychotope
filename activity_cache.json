@@ -1,8 +1,4 @@
 {
-    "linkedin.com": [
-        "productive",
-        "Job Portal"
-    ],
     "gemini.google.com": [
         "productive",
         "Coding Resource"
@@ -11,8 +7,8 @@
         "productive",
         "Coding Resource"
     ],
-    "chrome:": [
+    "linkedin.com": [
         "productive",
-        "Coding Resource"
+        "Job Portal"
     ]
 }
