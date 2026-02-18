@@ -39,3 +39,6 @@ chrome.tabs.onRemoved.addListener(() => reportAllTabs());
 
 // HEARTBEAT
 setInterval(reportAllTabs, 2000);
+
+
+// bro next task is. katya would be able to generate new quests on her own as well as if user inputs a task (quest) on their own, katya will check if its a valid one and if its needed and its price. no more than 3 active quests at a time 

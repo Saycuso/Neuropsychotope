@@ -1,5 +1,5 @@
 {
-    "date": "2026-02-17",
+    "date": "2026-02-18",
     "quests": [
         {
             "id": "q1",
@@ -13,7 +13,7 @@
                 "Career"
             ],
             "target_minutes": 5,
-            "current_minutes": 5.033333333333325,
+            "current_minutes": 5,
             "completed": true,
             "reward": 100
         },
@@ -30,7 +30,7 @@
                 "Career"
             ],
             "target_minutes": 15,
-            "current_minutes": 0.16666666666666666,
+            "current_minutes": 5.166666666666658,
             "completed": false,
             "reward": 300
         },

@@ -70,6 +70,7 @@ def update_quest_progress(url, duration_seconds, brain_label=""):
     
     current_priority = next((q for q in data["quests"] if not q["completed"]), None)
     
+    # Check if ALL quests are done
     if not current_priority:
         if not data.get("all_complete"):
             data["all_complete"] = True 
@@ -77,31 +78,35 @@ def update_quest_progress(url, duration_seconds, brain_label=""):
         return 0, "FREE_FLOW"
 
     clean_url = url.lower()
-    
-    # 1. CHECK URL
+
+    # 1. URL Match
     url_match = any(k in clean_url for k in current_priority.get("keywords", []))
     
-    # 2. CHECK BRAIN LABEL (The Smart AI Match)
+    # 2. AI Brain Label Match
     label_match = False
     if brain_label:
         smart_tags = current_priority.get("smart_tags", [])
-        # Check if "Job Portal" is inside the brain label (e.g. "Job Portal: unknown.com")
         label_match = any(tag.lower() in brain_label.lower() for tag in smart_tags)
 
+    # 3. Handle Progress AND Completion
     if url_match or label_match:
         minutes_added = duration_seconds / 60.0
         current_priority["current_minutes"] += minutes_added
         
         reward = 0
-        message = f"QUEST: {current_priority['title']} ({int(current_priority['current_minutes'])}/{current_priority['target_minutes']}m)"
-
+        
+        # Check if the quest JUST finished during this tick
         if current_priority["current_minutes"] >= current_priority["target_minutes"]:
             current_priority["completed"] = True
+            current_priority["current_minutes"] = current_priority["target_minutes"] # Cap the progress
             reward = current_priority["reward"]
             message = f"🏆 UNLOCKED NEXT: {current_priority['title']} Done! (+{reward})"
-        
+        else:
+            message = f"QUEST: {current_priority['title']} ({int(current_priority['current_minutes'])}/{current_priority['target_minutes']}m)"
+
         save_quests(data)
         return reward, message
 
+    # If the URL/Label doesn't match the CURRENT priority quest
     else:
         return 0, f"⛔ BLOCKED: Finish '{current_priority['title']}' First!"

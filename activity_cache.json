@@ -1,14 +1,38 @@
 {
-    "gemini.google.com": [
-        "productive",
-        "Coding Resource"
-    ],
-    "chatgpt.com": [
-        "productive",
-        "Coding Resource"
+    "google.com": [
+        "neutral",
+        "Browsing"
     ],
     "linkedin.com": [
         "productive",
         "Job Portal"
+    ],
+    "cutshort.io": [
+        "productive",
+        "Job Portal"
+    ],
+    "gemini.google.com": [
+        "neutral",
+        "Browsing"
+    ],
+    "chatgpt.com": [
+        "neutral",
+        "Browsing"
+    ],
+    "mail.google.com": [
+        "neutral",
+        "Browsing"
+    ],
+    "pornhub.org": [
+        "distraction",
+        "Entertainment"
+    ],
+    "loom.com": [
+        "neutral",
+        "Browsing"
+    ],
+    "chrome-extension:": [
+        "neutral",
+        "Browsing"
     ]
 }
